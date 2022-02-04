@@ -47,13 +47,13 @@ def collect_calls(view, rootfunction):
     # dict containing callee -> set(callers)
     calls = {}
     if (rootfunction == None):
-        functions = view.functions
+        functions = list(view.functions)
         rootlines = ['ROOT']
     else:
-        functions = map(lambda x: x.function, view.get_code_refs(rootfunction.start))
+        functions = [x.function for x in view.get_code_refs(rootfunction.start)]
         rootlines = [rootfunction.name]
 
-    for function in view.functions:
+    for function in functions:
         for ref in view.get_code_refs(function.start):
             caller = ref.function
             calls[function] = calls.get(function, set())
@@ -73,30 +73,29 @@ def collect_calls(view, rootfunction):
     callgraph.append(root_node)
     function_nodes = {}
 
-    for function in view.functions:
-        for callee in function.callees:
-            # create a new node if one doesn't exist already
-            callee_node = get_or_set_call_node(callgraph, function_nodes, callee)
+    for callee in functions:
+        # create a new node if one doesn't exist already
+        callee_node = get_or_set_call_node(callgraph, function_nodes, callee)
 
-            # create nodes for the callers, and add edges
-            callers = calls.get(callee, set())
+        # create nodes for the callers, and add edges
+        callers = calls.get(callee, set())
 
-            if not callers:
-                root_node.add_outgoing_edge(
-                    BranchType.FalseBranch, callee_node
-                )
+        if not callers:
+            root_node.add_outgoing_edge(
+                BranchType.FalseBranch, callee_node
+            )
 
-            for caller in callers:
-                caller_node = get_or_set_call_node(callgraph, function_nodes, caller)
+        for caller in callers:
+            caller_node = get_or_set_call_node(callgraph, function_nodes, caller)
 
-                # Add the edge between the caller and the callee
-                if ctypes.addressof(callee_node.handle.contents) not in [
-                    ctypes.addressof(edge.target.handle.contents)
-                    for edge in caller_node.outgoing_edges]:
-                        caller_node.add_outgoing_edge(
-                            BranchType.TrueBranch,
-                            callee_node
-                        )
+            # Add the edge between the caller and the callee
+            if ctypes.addressof(callee_node.handle.contents) not in [
+                ctypes.addressof(edge.target.handle.contents)
+                for edge in caller_node.outgoing_edges]:
+                    caller_node.add_outgoing_edge(
+                        BranchType.TrueBranch,
+                        callee_node
+                    )
 
     callgraph.layout_and_wait()
     callgraph.show('Callgraph')
